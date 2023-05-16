@@ -1,14 +1,8 @@
 import Head from 'next/head';
 import { useStoryblokState, getStoryblokApi, StoryblokComponent } from '@storyblok/react';
 
-export default function Home({ story }) {
-
-  console.log(story)
-
-  story = useStoryblokState(story, {
-    resolve_relations: ["popular_articles.articles"],
-  });
-  
+export default function Page({ story }) {
+  story = useStoryblokState(story);
   return (
     <>
     <Head>
@@ -18,20 +12,18 @@ export default function Home({ story }) {
     <StoryblokComponent blok={story.content} />
     </>
   );
-
 }
 
-export async function getStaticProps() {
-
-  let slug = 'home';
+export async function getStaticProps({ params }) {
+  let slug = params.slug ? params.slug.join('/') : 'home';
 
   let sbParams = {
     version: 'draft', // or 'published'
     resolve_links: 'url',
-    resolve_relations: ["popular_articles.articles"],
   };
 
   const storyblokApi = getStoryblokApi();
+
   let { data } = await storyblokApi.get(`cdn/stories/${slug}`, sbParams);
   let { data: config } = await storyblokApi.get('cdn/stories/config', sbParams);
 
@@ -43,5 +35,28 @@ export async function getStaticProps() {
     },
     revalidate: 3600,
   };
+}
 
+export async function getStaticPaths() {
+  const storyblokApi = getStoryblokApi();
+  let { data } = await storyblokApi.get('cdn/links/', {
+    version: 'draft',
+  });
+
+  let paths = [];
+  Object.keys(data.links).forEach((linkKey) => {
+    if (data.links[linkKey].is_folder || data.links[linkKey].slug === 'home') {
+      return;
+    }
+
+    const slug = data.links[linkKey].slug;
+    let splittedSlug = slug.split('/');
+
+    paths.push({ params: { slug: splittedSlug } });
+  });
+
+  return {
+    paths: paths,
+    fallback: false,
+  };
 }
